@@ -167,15 +167,33 @@ document.addEventListener('DOMContentLoaded', function() {
         sqlSection.style.display = 'none';
     });
 
-    sqlTab.addEventListener('click', () => {
-        // 移除其他tab的active类
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        // 隐藏其他section
-        document.querySelectorAll('div[id$="Section"]').forEach(s => s.style.display = 'none');
+    sqlTab.addEventListener('click', function() {
+        console.log('SQL tab clicked'); // 调试用
+        
+        // 移除所有tab的active类
+        jsonTab.classList.remove('active');
+        jsonToJavaTab.classList.remove('active');
+        timestampTab.classList.remove('active');
+        yamlTab.classList.remove('active');
+        hexTab.classList.remove('active');
+        base64Tab.classList.remove('active');
+        crontabTab.classList.remove('active');
+        
+        // 隐藏所有section
+        jsonSection.style.display = 'none';
+        jsonToJavaSection.style.display = 'none';
+        timestampSection.style.display = 'none';
+        yamlSection.style.display = 'none';
+        hexSection.style.display = 'none';
+        base64Section.style.display = 'none';
+        crontabSection.style.display = 'none';
         
         // 激活SQL tab和section
         sqlTab.classList.add('active');
         sqlSection.style.display = 'block';
+        
+        // 初始化SQL相关的事件监听器
+        initializeSqlEventListeners();
     });
 
     // 普通JSON格式化功能
@@ -803,145 +821,734 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // SQL类型切换时显示/隐藏相关字段
     document.getElementById('sqlType').addEventListener('change', function() {
-        const selectColumns = document.querySelector('.select-columns');
-        const updateValues = document.querySelector('.update-values');
+        const selectOptions = document.querySelectorAll('.select-options');
+        const updateOptions = document.querySelector('.update-options');
         
-        switch(this.value) {
-            case 'select':
-                selectColumns.style.display = 'block';
-                updateValues.style.display = 'none';
-                break;
-            case 'update':
-                selectColumns.style.display = 'none';
-                updateValues.style.display = 'block';
-                break;
-            case 'delete':
-                selectColumns.style.display = 'none';
-                updateValues.style.display = 'none';
-                break;
+        selectOptions.forEach(opt => {
+            opt.style.display = this.value === 'select' ? 'block' : 'none';
+        });
+        updateOptions.style.display = this.value === 'update' ? 'block' : 'none';
+    });
+
+    // 添加字段行
+    document.querySelector('.add-field').addEventListener('click', function() {
+        const fieldRow = document.createElement('div');
+        fieldRow.className = 'field-row';
+        fieldRow.innerHTML = `
+            <input type="text" class="field-name" placeholder="字段名">
+            <input type="text" class="field-alias" placeholder="别名(可选)">
+            <select class="field-function">
+                <option value="">无函数</option>
+                <option value="COUNT">COUNT</option>
+                <option value="SUM">SUM</option>
+                <option value="AVG">AVG</option>
+                <option value="MAX">MAX</option>
+                <option value="MIN">MIN</option>
+            </select>
+            <button class="remove-row">-</button>
+        `;
+        document.querySelector('.field-inputs').appendChild(fieldRow);
+    });
+
+    // 添加JOIN条件
+    document.querySelector('.add-join').addEventListener('click', function() {
+        const joinRow = document.createElement('div');
+        joinRow.className = 'join-row';
+        joinRow.innerHTML = `
+            <select class="join-type">
+                <option value="JOIN">INNER JOIN</option>
+                <option value="LEFT JOIN">LEFT JOIN</option>
+                <option value="RIGHT JOIN">RIGHT JOIN</option>
+            </select>
+            <input type="text" class="join-condition" placeholder="例如: user.id = order.user_id">
+            <button class="remove-row">-</button>
+        `;
+        document.querySelector('.join-inputs').appendChild(joinRow);
+    });
+
+    // 添加WHERE条件
+    document.querySelector('.add-where').addEventListener('click', function() {
+        const whereRow = document.createElement('div');
+        whereRow.className = 'where-row';
+        whereRow.innerHTML = `
+            <input type="text" class="where-field" placeholder="字段">
+            <select class="where-operator">
+                <option value="=">=</option>
+                <option value="!=">!=</option>
+                <option value=">">></option>
+                <option value="<"><</option>
+                <option value=">=">>=</option>
+                <option value="<="><=</option>
+                <option value="LIKE">LIKE</option>
+                <option value="IN">IN</option>
+                <option value="NOT IN">NOT IN</option>
+                <option value="IS NULL">IS NULL</option>
+                <option value="IS NOT NULL">IS NOT NULL</option>
+            </select>
+            <input type="text" class="where-value" placeholder="值">
+            <select class="where-connector">
+                <option value="AND">AND</option>
+                <option value="OR">OR</option>
+            </select>
+            <button class="remove-row">-</button>
+        `;
+        document.querySelector('.where-inputs').appendChild(whereRow);
+    });
+
+    // 添加ORDER BY条件
+    document.querySelector('.add-order-by').addEventListener('click', function() {
+        const orderByRow = document.createElement('div');
+        orderByRow.className = 'order-by-row';
+        orderByRow.innerHTML = `
+            <input type="text" class="order-by-field" placeholder="字段名">
+            <select class="order-direction">
+                <option value="ASC">升序</option>
+                <option value="DESC">降序</option>
+            </select>
+            <button class="remove-row">-</button>
+        `;
+        document.querySelector('.order-by-inputs').appendChild(orderByRow);
+    });
+
+    // 添加SET子句
+    document.querySelector('.add-set').addEventListener('click', function() {
+        const setRow = document.createElement('div');
+        setRow.className = 'set-row';
+        setRow.innerHTML = `
+            <input type="text" class="set-field" placeholder="字段名">
+            <input type="text" class="set-value" placeholder="新值">
+            <button class="remove-row">-</button>
+        `;
+        document.querySelector('.set-inputs').appendChild(setRow);
+    });
+
+    // 删除行通用处理
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-row')) {
+            e.target.parentElement.remove();
         }
     });
 
-    // 生成SQL按钮点击事件
-    document.getElementById('generateSql').addEventListener('click', function() {
-        const dbName = document.getElementById('dbName').value.trim();
-        const sqlType = document.getElementById('sqlType').value;
-        const tableNames = document.getElementById('tableNames').value.trim();
-        const joinConditions = document.getElementById('joinConditions').value.trim();
-        const whereConditions = document.getElementById('whereConditions').value.trim();
-        const selectColumns = document.getElementById('selectColumns').value.trim();
-        const updateValues = document.getElementById('updateValues').value.trim();
-        
-        if (!dbName || !tableNames) {
-            alert('请至少输入数据库名和表名！');
-            return;
-        }
-        
-        let sql = '';
-        const tables = tableNames.split(',').map(t => t.trim());
+    // SQL注入防护
+    function sanitizeInput(input) {
+        // 基本的SQL注入防护
+        return input.replace(/['";\\]/g, '\\$&');
+    }
+
+    // 验证SQL按钮点击事件
+    document.getElementById('validateSql').addEventListener('click', function() {
+        const sql = document.getElementById('sqlOutput').value;
+        const errorDiv = document.getElementById('sqlError');
         
         try {
-            switch(sqlType) {
-                case 'select':
-                    sql = generateSelectSql(dbName, tables, selectColumns, joinConditions, whereConditions);
-                    break;
-                case 'update':
-                    sql = generateUpdateSql(dbName, tables, updateValues, joinConditions, whereConditions);
-                    break;
-                case 'delete':
-                    sql = generateDeleteSql(dbName, tables, joinConditions, whereConditions);
-                    break;
-            }
-            
-            document.getElementById('sqlOutput').value = sql;
+            // 基本的SQL语法验证
+            validateSqlSyntax(sql);
+            errorDiv.style.display = 'none';
+            alert('SQL语法验证通过！');
         } catch (error) {
-            alert('生成SQL时出错: ' + error.message);
+            errorDiv.textContent = '错误: ' + error.message;
+            errorDiv.style.display = 'block';
         }
     });
 
-    // 复制SQL按钮点击事件
-    document.getElementById('copySql').addEventListener('click', function() {
+    // SQL语法验证
+    function validateSqlSyntax(sql) {
+        // 基本的SQL语法检查
+        if (!sql.trim()) {
+            throw new Error('SQL语句不能为空');
+        }
+        
+        const sqlType = sql.trim().split(' ')[0].toUpperCase();
+        if (!['SELECT', 'UPDATE', 'DELETE'].includes(sqlType)) {
+            throw new Error('不支持的SQL类型');
+        }
+        
+        // 检查基本的SQL注入风险
+        if (/;.+/i.test(sql)) {
+            throw new Error('检测到多条SQL语句，可能存在SQL注入风险');
+        }
+        
+        // 更多的语法检查规则...
+    }
+
+    // 添加表名行
+    document.querySelector('.add-table').addEventListener('click', function() {
+        const tableRow = document.createElement('div');
+        tableRow.className = 'table-row';
+        tableRow.innerHTML = `
+            <input type="text" class="table-name" placeholder="表名">
+            <input type="text" class="table-alias" placeholder="别名" style="width: 80px;">
+            <button class="remove-row">-</button>
+        `;
+        document.querySelector('.table-inputs').appendChild(tableRow);
+
+        // 为新添加的表名输入框添加自动补全别名功能
+        const newTableInput = tableRow.querySelector('.table-name');
+        newTableInput.addEventListener('input', function() {
+            const aliasInput = this.parentElement.querySelector('.table-alias');
+            if (!aliasInput.value) {
+                const tableName = this.value.trim();
+                if (tableName) {
+                    aliasInput.value = tableName.charAt(0).toUpperCase();
+                }
+            }
+        });
+    });
+
+    // 修改 generateSelectSql 函数以更好地支持表别名和条件
+    function generateSelectSql(dbName, tables, fields, joins, whereConditions, groupBy, having, orderBy) {
+        let sql = 'SELECT ';
+        
+        // 处理查询字段
+        if (fields && fields.length > 0) {
+            const selectedFields = fields.map(f => {
+                let field = f.name;
+                if (f.function) {
+                    field = `${f.function}(${field})`;
+                }
+                if (f.alias) {
+                    field += ` AS ${f.alias}`;
+                }
+                return field;
+            }).join(', ');
+            sql += selectedFields;
+        } else {
+            sql += '*'; // 如果没有指定字段，则查询所有字段
+        }
+
+        // 处理FROM子句，包含表名和别名
+        const mainTable = tables[0];
+        sql += `\nFROM ${dbName}.${mainTable.name}`;
+        if (mainTable.alias) {
+            sql += ` ${mainTable.alias}`; // 注意这里去掉了AS关键字，使语法更简洁
+        }
+        
+        // 处理JOIN，使用表别名
+        if (joins && joins.length > 0) {
+            joins.forEach((join, index) => {
+                const joinTable = tables[index + 1];
+                if (!joinTable) return; // 防止数组越界
+                
+                sql += `\n${join.type} ${dbName}.${joinTable.name}`;
+                if (joinTable.alias) {
+                    sql += ` ${joinTable.alias}`; // 同样去掉AS关键字
+                }
+                sql += ` ON ${join.condition}`;
+            });
+        }
+        
+        // 处理WHERE条件
+        if (whereConditions && whereConditions.length > 0) {
+            sql += '\nWHERE ';
+            sql += whereConditions.map((condition, index) => {
+                let clause = '';
+                if (index > 0) {
+                    clause += `${condition.connector} `; // 添加连接词（AND/OR）
+                }
+                
+                if (['IS NULL', 'IS NOT NULL'].includes(condition.operator)) {
+                    clause += `${condition.field} ${condition.operator}`;
+                } else if (condition.operator === 'IN' || condition.operator === 'NOT IN') {
+                    // 处理IN条件
+                    let values = condition.value.split(',').map(v => v.trim());
+                    values = values.map(v => isNaN(v) ? `'${v}'` : v);
+                    clause += `${condition.field} ${condition.operator} (${values.join(', ')})`;
+                } else {
+                    // 处理普通条件
+                    let value = condition.value;
+                    // 如果是字符串且没有引号，添加引号
+                    if (typeof value === 'string' && !value.startsWith("'") && !value.endsWith("'") && isNaN(value)) {
+                        value = `'${value}'`;
+                    }
+                    clause += `${condition.field} ${condition.operator} ${value}`;
+                }
+                return clause;
+            }).join(' ');
+        }
+        
+        // 处理GROUP BY
+        if (groupBy && groupBy.length > 0) {
+            sql += '\nGROUP BY ' + groupBy.join(', ');
+            if (having) {
+                sql += '\nHAVING ' + having;
+            }
+        }
+        
+        // 处理ORDER BY
+        if (orderBy && orderBy.length > 0) {
+            sql += '\nORDER BY ' + orderBy.map(o => `${o.field} ${o.direction}`).join(', ');
+        }
+        
+        return sql + ';';
+    }
+
+    // 修改 initializeSqlEventListeners 函数中的生成SQL按钮部分
+    function initializeSqlEventListeners() {
+        console.log('Initializing SQL event listeners...'); // 调试用
+
+        // 为所有SQL类型按钮添加点击事件
+        const sqlTypeButtons = document.querySelectorAll('.sql-type-btn');
+        console.log('Found SQL type buttons:', sqlTypeButtons.length); // 调试用
+        sqlTypeButtons.forEach(btn => {
+            btn.onclick = function() {
+                document.querySelectorAll('.sql-type-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // 根据SQL类型显示/隐藏SET子句输入
+                const setClause = document.querySelector('.set-clause');
+                if (setClause) {
+                    setClause.style.display = this.dataset.type === 'update' ? 'block' : 'none';
+                }
+            };
+        });
+
+        // 添加表行按钮
+        const addTableBtn = document.querySelector('.add-table');
+        console.log('Found add table button:', addTableBtn); // 调试用
+        if (addTableBtn) {
+            addTableBtn.onclick = function() {
+                const tableRow = document.createElement('div');
+                tableRow.className = 'table-row';
+                tableRow.innerHTML = `
+                    <input type="text" class="table-name" placeholder="表名">
+                    <input type="text" class="table-alias" placeholder="别名" style="width: 80px;">
+                    <button class="remove-row">-</button>
+                `;
+                document.querySelector('.table-inputs').appendChild(tableRow);
+            };
+        }
+
+        // 添加查询条件按钮
+        const addWhereBtn = document.querySelector('.add-where');
+        console.log('Found add where button:', addWhereBtn); // 调试用
+        if (addWhereBtn) {
+            addWhereBtn.onclick = function() {
+                const whereRow = document.createElement('div');
+                whereRow.className = 'where-row';
+                whereRow.innerHTML = `
+                    <input type="text" class="where-field" placeholder="字段名">
+                    <select class="where-operator" style="width: 100px;">
+                        <option value="=">=</option>
+                        <option value="!=">!=</option>
+                        <option value=">">></option>
+                        <option value="<"><</option>
+                        <option value=">=">>=</option>
+                        <option value="<="><=</option>
+                        <option value="LIKE">LIKE</option>
+                        <option value="IN">IN</option>
+                        <option value="IS NULL">IS NULL</option>
+                    </select>
+                    <input type="text" class="where-value" placeholder="值">
+                    <select class="where-connector" style="width: 70px;">
+                        <option value="AND">AND</option>
+                        <option value="OR">OR</option>
+                    </select>
+                    <button class="remove-row">-</button>
+                `;
+                document.querySelector('.where-inputs').appendChild(whereRow);
+            };
+        }
+
+        // 删除行按钮（使用事件委托）
+        document.body.onclick = function(e) {
+            if (e.target.classList.contains('remove-row')) {
+                e.target.parentElement.remove();
+            }
+        };
+
+        // 修改SQL输出框为可编辑
         const sqlOutput = document.getElementById('sqlOutput');
-        sqlOutput.select();
-        document.execCommand('copy');
-        alert('SQL已复制到剪贴板！');
-    });
+        if (sqlOutput) {
+            // 移除readonly属性
+            sqlOutput.removeAttribute('readonly');
+        }
 
-    // 生成SELECT SQL
-    function generateSelectSql(dbName, tables, columns, joinConditions, whereConditions) {
-        const selectCols = columns && columns !== '*' ? columns : '*';
-        let sql = `SELECT ${selectCols}\nFROM ${dbName}.${tables[0]}`;
-        
-        // 添加JOIN条件
-        if (tables.length > 1 && joinConditions) {
-            const joins = joinConditions.split('\n').filter(j => j.trim());
-            joins.forEach(join => {
-                sql += `\nJOIN ${dbName}.${tables[joins.indexOf(join) + 1]} ON ${join.trim()}`;
-            });
+        // 格式化SQL按钮
+        const formatSqlBtn = document.getElementById('formatSql');
+        if (formatSqlBtn) {
+            formatSqlBtn.onclick = function() {
+                const sqlOutput = document.getElementById('sqlOutput');
+                const sql = sqlOutput.value.trim();
+                if (sql) {
+                    try {
+                        sqlOutput.value = formatSQL(sql);
+                    } catch (error) {
+                        alert('格式化SQL出错: ' + error.message);
+                    }
+                } else {
+                    alert('请先输入SQL语句');
+                }
+            };
         }
-        
-        // 添加WHERE条件
-        if (whereConditions) {
-            const conditions = whereConditions.split('\n').filter(c => c.trim());
-            if (conditions.length > 0) {
-                sql += `\nWHERE ${conditions.join('\n  AND ')}`;
-            }
+
+        // 生成SQL按钮
+        const generateSqlBtn = document.getElementById('generateSql');
+        if (generateSqlBtn) {
+            generateSqlBtn.onclick = function() {
+                try {
+                    const sqlType = document.querySelector('.sql-type-btn.active').dataset.type;
+                    let sql = '';
+                    
+                    switch(sqlType) {
+                        case 'select':
+                            sql = generateSimpleSelectSql();
+                            break;
+                        case 'update':
+                            sql = generateSimpleUpdateSql();
+                            break;
+                        case 'delete':
+                            sql = generateSimpleDeleteSql();
+                            break;
+                        default:
+                            throw new Error('未支持的SQL类型');
+                    }
+                    
+                    document.getElementById('sqlOutput').value = sql;
+                } catch (error) {
+                    alert('生成SQL出错: ' + error.message);
+                }
+            };
         }
-        
-        return sql + ';';
+
+        // 复制SQL按钮
+        const copySqlBtn = document.getElementById('copySql');
+        if (copySqlBtn) {
+            copySqlBtn.onclick = function() {
+                const sqlOutput = document.getElementById('sqlOutput');
+                if (sqlOutput.value.trim()) {
+                    sqlOutput.select();
+                    document.execCommand('copy');
+                    alert('SQL已复制到剪贴板！');
+                } else {
+                    alert('没有可复制的SQL语句');
+                }
+            };
+        }
+
+        // 清空表单按钮
+        const clearFormBtn = document.getElementById('clearForm');
+        if (clearFormBtn) {
+            clearFormBtn.onclick = function() {
+                // 清空数据库名
+                document.getElementById('dbName').value = '';
+                
+                // 清空表格行，保留第一行
+                const tableRows = document.querySelectorAll('.table-row');
+                tableRows.forEach((row, index) => {
+                    if (index === 0) {
+                        // 清空第一行的输入
+                        row.querySelector('.table-name').value = '';
+                        row.querySelector('.table-alias').value = '';
+                    } else {
+                        // 删除其他行
+                        row.remove();
+                    }
+                });
+
+                // 清空JOIN条件
+                const joinCondition = document.querySelector('.join-condition');
+                if (joinCondition) {
+                    joinCondition.value = '';
+                }
+
+                // 清空WHERE条件，保留第一行
+                const whereRows = document.querySelectorAll('.where-row');
+                whereRows.forEach((row, index) => {
+                    if (index === 0) {
+                        // 清空第一行的输入
+                        row.querySelector('.where-field').value = '';
+                        row.querySelector('.where-value').value = '';
+                        // 重置选择框为默认值
+                        row.querySelector('.where-operator').selectedIndex = 0;
+                        row.querySelector('.where-connector').selectedIndex = 0;
+                    } else {
+                        // 删除其他行
+                        row.remove();
+                    }
+                });
+
+                // 清空SQL输出
+                document.getElementById('sqlOutput').value = '';
+
+                // 重置SQL类型为SELECT
+                document.querySelectorAll('.sql-type-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.type === 'select') {
+                        btn.classList.add('active');
+                    }
+                });
+
+                // 清空SET条件，保留第一行
+                const setRows = document.querySelectorAll('.set-row');
+                setRows.forEach((row, index) => {
+                    if (index === 0) {
+                        // 清空第一行的输入
+                        row.querySelector('.set-field').value = '';
+                        row.querySelector('.set-value').value = '';
+                    } else {
+                        // 删除其他行
+                        row.remove();
+                    }
+                });
+            };
+        }
     }
 
-    // 生成UPDATE SQL
-    function generateUpdateSql(dbName, tables, updateValues, joinConditions, whereConditions) {
-        if (!updateValues) {
-            throw new Error('更新语句需要指定更新值！');
+    // SQL格式化函数
+    function formatSQL(sql) {
+        // 基本的SQL验证
+        if (!sql.match(/\b(SELECT|UPDATE|DELETE|INSERT)\b/i)) {
+            throw new Error('无效的SQL语句');
         }
-        
-        let sql = `UPDATE ${dbName}.${tables[0]}`;
-        
-        // 添加JOIN条件
-        if (tables.length > 1 && joinConditions) {
-            const joins = joinConditions.split('\n').filter(j => j.trim());
-            joins.forEach(join => {
-                sql += `\nJOIN ${dbName}.${tables[joins.indexOf(join) + 1]} ON ${join.trim()}`;
-            });
-        }
-        
-        // 添加SET子句
-        const setValues = updateValues.split('\n').filter(v => v.trim());
-        sql += `\nSET ${setValues.join(',\n    ')}`;
-        
-        // 添加WHERE条件
-        if (whereConditions) {
-            const conditions = whereConditions.split('\n').filter(c => c.trim());
-            if (conditions.length > 0) {
-                sql += `\nWHERE ${conditions.join('\n  AND ')}`;
+
+        // 移除多余的空白字符
+        sql = sql.replace(/\s+/g, ' ').trim();
+
+        // 主要关键字
+        const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'ORDER BY', 'GROUP BY', 
+                         'HAVING', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 
+                         'LIMIT', 'OFFSET', 'UPDATE', 'DELETE', 'INSERT INTO', 'VALUES'];
+
+        // 在关键字前添加换行
+        keywords.forEach(keyword => {
+            const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+            sql = sql.replace(regex, `\n${keyword}`);
+        });
+
+        // 处理括号
+        sql = sql.replace(/\(/g, '\n(');
+        sql = sql.replace(/\)/g, ')\n');
+
+        // 分割成行
+        let lines = sql.split('\n').filter(line => line.trim());
+
+        // 缩进处理
+        let indentLevel = 0;
+        let formattedLines = lines.map(line => {
+            line = line.trim();
+            
+            // 减少缩进的情况
+            if (line.startsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
             }
+
+            // 添加缩进
+            const indent = '    '.repeat(indentLevel);
+            let formattedLine = indent + line;
+
+            // 增加缩进的情况
+            if (line.includes('(') && !line.includes(')')) {
+                indentLevel++;
+            }
+
+            return formattedLine;
+        });
+
+        // 特殊处理AND/OR，增加额外缩进
+        formattedLines = formattedLines.map(line => {
+            if (line.trim().startsWith('AND ') || line.trim().startsWith('OR ')) {
+                return line.replace(/^(\s*)/, '$1    ');
+            }
+            return line;
+        });
+
+        // 移除行尾的逗号
+        formattedLines = formattedLines.map(line => line.replace(/,\s*$/, ''));
+
+        // 合并所有行
+        let formattedSQL = formattedLines.join('\n');
+
+        // 确保以分号结束
+        if (!formattedSQL.trim().endsWith(';')) {
+            formattedSQL += ';';
         }
-        
-        return sql + ';';
+
+        return formattedSQL;
     }
 
-    // 生成DELETE SQL
-    function generateDeleteSql(dbName, tables, joinConditions, whereConditions) {
-        let sql = `DELETE ${tables[0]}\nFROM ${dbName}.${tables[0]}`;
+    // 修改生成SELECT SQL的函数，不再使用addJoinsAndWhere
+    function generateSimpleSelectSql() {
+        const dbName = document.getElementById('dbName').value.trim();
+        const tables = collectTables();
         
-        // 添加JOIN条件
-        if (tables.length > 1 && joinConditions) {
-            const joins = joinConditions.split('\n').filter(j => j.trim());
-            joins.forEach(join => {
-                sql += `\nJOIN ${dbName}.${tables[joins.indexOf(join) + 1]} ON ${join.trim()}`;
+        if (!dbName) throw new Error('请输入数据库名！');
+        if (tables.length === 0) throw new Error('请至少输入一个表名！');
+
+        let sql = 'SELECT *\n';
+        sql += `FROM ${dbName}.${tables[0].name}`;
+        if (tables[0].alias) sql += ` ${tables[0].alias}`;
+
+        // 处理JOIN
+        const joins = collectJoins();
+        if (joins.length > 0) {
+            joins.forEach((join, index) => {
+                if (tables[index + 1]) {
+                    sql += `\n${join.type} ${dbName}.${tables[index + 1].name}`;
+                    if (tables[index + 1].alias) {
+                        sql += ` ${tables[index + 1].alias}`;
+                    }
+                    sql += ` ON ${join.condition}`;
+                }
             });
         }
+
+        // 处理WHERE条件
+        const where = collectWhere();
+        if (where.length > 0) {
+            sql += '\nWHERE ' + where.map((condition, index) => {
+                const connector = index > 0 ? condition.connector + ' ' : '';
+                let value = condition.value;
+                if (typeof value === 'string' && !value.startsWith("'") && !value.endsWith("'") && isNaN(value)) {
+                    value = `'${value}'`;
+                }
+                return connector + `${condition.field} ${condition.operator} ${value}`;
+            }).join('');
+        }
+
+        return formatSQL(sql + ';');
+    }
+
+    // 在generateSimpleSelectSql函数后添加完整的UPDATE和DELETE函数实现
+    function generateSimpleUpdateSql() {
+        const dbName = document.getElementById('dbName').value.trim();
+        const tables = collectTables();
         
-        // 添加WHERE条件
-        if (whereConditions) {
-            const conditions = whereConditions.split('\n').filter(c => c.trim());
-            if (conditions.length > 0) {
-                sql += `\nWHERE ${conditions.join('\n  AND ')}`;
-            }
+        if (!dbName) throw new Error('请输入数据库名！');
+        if (tables.length === 0) throw new Error('请至少输入一个表名！');
+
+        let sql = `UPDATE ${dbName}.${tables[0].name}`;
+        if (tables[0].alias) sql += ` ${tables[0].alias}`;
+
+        // 处理JOIN
+        const joins = collectJoins();
+        if (joins.length > 0) {
+            joins.forEach((join, index) => {
+                if (tables[index + 1]) {
+                    sql += `\n${join.type} ${dbName}.${tables[index + 1].name}`;
+                    if (tables[index + 1].alias) {
+                        sql += ` ${tables[index + 1].alias}`;
+                    }
+                    sql += ` ON ${join.condition}`;
+                }
+            });
+        }
+
+        // 处理SET子句
+        const setClauses = collectSetClauses();
+        if (setClauses.length === 0) {
+            throw new Error('请至少输入一个要修改的字段！');
         }
         
-        return sql + ';';
+        sql += '\nSET ' + setClauses.map(set => {
+            let value = set.value;
+            if (typeof value === 'string' && !value.startsWith("'") && !value.endsWith("'") && isNaN(value)) {
+                value = `'${value}'`;
+            }
+            return `${set.field} = ${value}`;
+        }).join(',\n    ');
+
+        // 处理WHERE条件
+        const where = collectWhere();
+        if (where.length > 0) {
+            sql += '\nWHERE ' + where.map((condition, index) => {
+                const connector = index > 0 ? condition.connector + ' ' : '';
+                let value = condition.value;
+                if (typeof value === 'string' && !value.startsWith("'") && !value.endsWith("'") && isNaN(value)) {
+                    value = `'${value}'`;
+                }
+                return connector + `${condition.field} ${condition.operator} ${value}`;
+            }).join('');
+        }
+
+        return formatSQL(sql + ';');
+    }
+
+    function generateSimpleDeleteSql() {
+        const dbName = document.getElementById('dbName').value.trim();
+        const tables = collectTables();
+        
+        if (!dbName) throw new Error('请输入数据库名！');
+        if (tables.length === 0) throw new Error('请至少输入一个表名！');
+
+        // DELETE语法：DELETE t1,t2 FROM t1 JOIN t2 ON ... WHERE ...
+        // 收集所有要删除的表别名
+        const deleteAliases = tables.map(table => table.alias)
+                                   .filter(alias => alias)
+                                   .join(',');
+        
+        // 构建DELETE语句
+        let sql = `DELETE ${deleteAliases}\nFROM ${dbName}.${tables[0].name}`;
+        if (tables[0].alias) sql += ` ${tables[0].alias}`;
+
+        // 处理JOIN
+        const joins = collectJoins();
+        if (joins.length > 0 && tables.length > 1) {
+            joins.forEach((join, index) => {
+                if (tables[index + 1]) {
+                    sql += `\n${join.type} ${dbName}.${tables[index + 1].name}`;
+                    if (tables[index + 1].alias) {
+                        sql += ` ${tables[index + 1].alias}`;
+                    }
+                    sql += ` ON ${join.condition}`;
+                }
+            });
+        }
+
+        // 处理WHERE条件
+        const where = collectWhere();
+        if (where.length > 0) {
+            sql += '\nWHERE ' + where.map((condition, index) => {
+                const connector = index > 0 ? condition.connector + ' ' : '';
+                let value = condition.value;
+                if (typeof value === 'string' && !value.startsWith("'") && !value.endsWith("'") && isNaN(value)) {
+                    value = `'${value}'`;
+                }
+                return connector + `${condition.field} ${condition.operator} ${value}`;
+            }).join('');
+        }
+
+        return formatSQL(sql + ';');
+    }
+
+    // 收集表信息
+    function collectTables() {
+        const tableRows = document.querySelectorAll('.table-row');
+        const tables = [];
+        
+        tableRows.forEach(row => {
+            const name = row.querySelector('.table-name').value.trim();
+            const alias = row.querySelector('.table-alias').value.trim();
+            if (name) {
+                tables.push({ name, alias });
+            }
+        });
+        
+        return tables;
+    }
+
+    // 收集JOIN条件
+    function collectJoins() {
+        return Array.from(document.querySelectorAll('.join-row')).map(row => ({
+            type: row.querySelector('.join-type').value,
+            condition: row.querySelector('.join-condition').value.trim()
+        })).filter(join => join.condition);
+    }
+
+    // 收集WHERE条件
+    function collectWhere() {
+        return Array.from(document.querySelectorAll('.where-row')).map(row => ({
+            field: row.querySelector('.where-field').value.trim(),
+            operator: row.querySelector('.where-operator').value,
+            value: row.querySelector('.where-value').value.trim(),
+            connector: row.querySelector('.where-connector').value
+        })).filter(condition => condition.field && (condition.value || ['IS NULL', 'IS NOT NULL'].includes(condition.operator)));
+    }
+
+    // 修改收集SET子句的函数
+    function collectSetClauses() {
+        return Array.from(document.querySelectorAll('.set-row')).map(row => ({
+            field: row.querySelector('.set-field').value.trim(),
+            value: row.querySelector('.set-value').value.trim()
+        })).filter(set => set.field && set.value);
     }
 }); 
