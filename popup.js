@@ -200,7 +200,34 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('formatJson').addEventListener('click', function() {
         const input = document.getElementById('jsonInput');
         try {
-            // 清理JSON文本（移除注释）
+            let jsonToFormat = input.value;
+            
+            // 新增：检查是否为字符串形式的JSON (如 "[{\"key\":\"value\"}]")
+            if ((jsonToFormat.startsWith('"') && jsonToFormat.endsWith('"')) || 
+                (jsonToFormat.startsWith("'") && jsonToFormat.endsWith("'"))) {
+                try {
+                    // 移除外层引号
+                    let stringContent = jsonToFormat.slice(1, -1);
+                    
+                    // 处理尾部可能的换行符
+                    if (stringContent.endsWith('\\n')) {
+                        stringContent = stringContent.slice(0, -2);
+                    }
+                    
+                    // 解析字符串内容
+                    jsonToFormat = JSON.parse(`"${stringContent}"`);
+                    
+                    // 解析成功后，直接格式化并返回结果
+                    const obj = JSON.parse(jsonToFormat);
+                    input.value = JSON.stringify(obj, null, 4);
+                    return; // 提前返回，不执行原来的逻辑
+                } catch (strError) {
+                    console.log("字符串形式JSON解析失败，尝试原有方式解析", strError);
+                    // 失败后继续使用原有逻辑处理
+                }
+            }
+            
+            // 原有逻辑：清理JSON文本（移除注释）
             const cleanJson = input.value.split('\n').map(line => {
                 return line.split('//')[0].trim();
             }).join('\n');
@@ -209,6 +236,34 @@ document.addEventListener('DOMContentLoaded', function() {
             const obj = JSON.parse(cleanJson);
             input.value = JSON.stringify(obj, null, 4);
         } catch (e) {
+            // 如果常规解析失败，尝试额外的方法处理转义字符
+            try {
+                if (input.value.includes('\\"')) {
+                    // 直接处理转义字符
+                    const unescaped = input.value.replace(/\\"/g, '"')
+                                              .replace(/\\'/g, "'")
+                                              .replace(/\\\\/g, "\\");
+                    
+                    // 如果开头结尾有引号，尝试去除
+                    let cleanContent = unescaped;
+                    if ((unescaped.startsWith('"') && unescaped.endsWith('"')) || 
+                        (unescaped.startsWith("'") && unescaped.endsWith("'"))) {
+                        cleanContent = unescaped.slice(1, -1);
+                    }
+                    
+                    // 处理尾部可能的换行符
+                    if (cleanContent.endsWith('\\n')) {
+                        cleanContent = cleanContent.slice(0, -2);
+                    }
+                    
+                    const obj = JSON.parse(cleanContent);
+                    input.value = JSON.stringify(obj, null, 4);
+                    return;
+                }
+            } catch (fallbackError) {
+                console.error("尝试处理转义字符失败:", fallbackError);
+            }
+            
             alert('无效的JSON格式！' + e.message);
         }
     });
